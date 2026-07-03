@@ -20,6 +20,7 @@ RESULT_KEYS = (
     "O_NbDegresHeures_max",
 )
 ENVELOPE_KEYS = ("A_opv", "A_ophh", "A_baies", "A_T", "L_PT")
+NUMBER_PATTERN = r"[-+]?(?:\d+(?:[\.,]\d*)?|[\.,]\d+)(?:[eE][-+]?\d+)?"
 
 
 def local_name(tag):
@@ -90,7 +91,7 @@ def parse_deepwatt_header(path):
 
     comment = match.group(1)
     for key in DEEPWATT_KEYS:
-        key_match = re.search(rf"\b{re.escape(key)}\s*=\s*([0-9]+(?:[\.,][0-9]+)?)", comment)
+        key_match = re.search(rf"\b{re.escape(key)}\s*=\s*({NUMBER_PATTERN})", comment)
         if key_match:
             values[key] = to_float(key_match.group(1))
     return values
@@ -130,9 +131,9 @@ def extract_metrics(path):
     for key in ENVELOPE_KEYS:
         data[key] = to_float(find_first(root, key))
 
-    shab_ref = data["shab_datas_comp"] if data["shab_datas_comp"] is not None else data["shab_rset"]
+    data["shab_ref"] = data["shab_datas_comp"] if data["shab_datas_comp"] is not None else data["shab_rset"]
     data["compacite_reelle"] = (
-        data["A_T"] / shab_ref if data["A_T"] is not None and shab_ref not in (None, 0) else None
+        data["A_T"] / data["shab_ref"] if data["A_T"] is not None and data["shab_ref"] not in (None, 0) else None
     )
 
     data["warn_shab_mismatch"] = (
@@ -141,14 +142,14 @@ def extract_metrics(path):
         and not almost_equal(data["shab_datas_comp"], data["shab_rset"], tolerance=0.05)
     )
     data["warn_sref_mismatch"] = (
-        shab_ref is not None
+        data["shab_ref"] is not None
         and data["sref_bat_existant"] is not None
-        and not almost_equal(shab_ref, data["sref_bat_existant"], tolerance=1.0)
+        and not almost_equal(data["shab_ref"], data["sref_bat_existant"], tolerance=1.0)
     )
     data["warn_ahab_mismatch"] = (
-        shab_ref is not None
+        data["shab_ref"] is not None
         and data["A_hab_gr_em_e"] is not None
-        and not almost_equal(shab_ref, data["A_hab_gr_em_e"], tolerance=0.05)
+        and not almost_equal(data["shab_ref"], data["A_hab_gr_em_e"], tolerance=0.05)
     )
 
     def compliant(value_key, max_key):
@@ -195,7 +196,7 @@ def print_diagnostic(item):
 
     ahab_line = f"  A_hab_gr_em_e   : {fmt_number(item.get('A_hab_gr_em_e'), 3)} m²"
     if item.get("warn_ahab_mismatch"):
-        ahab_line += f"  ⚠️  INCOHÉRENCE (devrait être ~{fmt_number(item.get('shab_datas_comp') or item.get('shab_rset'), 3)})"
+        ahab_line += f"  ⚠️  INCOHÉRENCE (devrait être ~{fmt_number(item.get('shab_ref'), 3)})"
     print(ahab_line)
 
     print("  Cohérence SHAB  : " + ("❌ INCOHÉRENCE" if item.get("warn_shab_mismatch") else "✅ OK"))
