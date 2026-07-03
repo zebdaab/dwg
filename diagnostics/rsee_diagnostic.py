@@ -42,7 +42,7 @@ def to_float(value):
 def fmt_number(value, digits=3):
     if value is None:
         return "N/A"
-    return f"{value:.{digits}f}".rstrip("0").rstrip(".")
+    return f"{value:.{digits}f}".rstrip("0").rstrip(".") or "0"
 
 
 def almost_equal(a, b, tolerance=1e-2):
@@ -133,7 +133,9 @@ def extract_metrics(path):
 
     data["shab_ref"] = data["shab_datas_comp"] if data["shab_datas_comp"] is not None else data["shab_rset"]
     data["compacite_reelle"] = (
-        data["A_T"] / data["shab_ref"] if data["A_T"] is not None and data["shab_ref"] not in (None, 0) else None
+        data["A_T"] / data["shab_ref"]
+        if data["A_T"] is not None and data["shab_ref"] is not None and data["shab_ref"] != 0
+        else None
     )
 
     data["warn_shab_mismatch"] = (
@@ -196,7 +198,7 @@ def print_diagnostic(item):
 
     ahab_line = f"  A_hab_gr_em_e   : {fmt_number(item.get('A_hab_gr_em_e'), 3)} m²"
     if item.get("warn_ahab_mismatch"):
-        ahab_line += f"  ⚠️  INCOHÉRENCE (devrait être ~{fmt_number(item.get('shab_ref'), 3)})"
+        ahab_line += f"  ⚠️  INCOHÉRENCE (devrait correspondre à ~{fmt_number(item.get('shab_ref'), 3)})"
     print(ahab_line)
 
     print("  Cohérence SHAB  : " + ("❌ INCOHÉRENCE" if item.get("warn_shab_mismatch") else "✅ OK"))
